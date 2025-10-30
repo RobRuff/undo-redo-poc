@@ -1,4 +1,3 @@
-
 import { Command } from '../command';
 
 export class UndoRedoContext {
@@ -8,25 +7,19 @@ export class UndoRedoContext {
   private multiEventCommands: Command[] = [];
 
   register(command: Command) {
+    command.execute();
     if (this.isMultiEvent) {
       this.multiEventCommands.push(command);
     } else {
       this.undoStack.push(command);
       this.redoStack = [];
     }
-    command.execute();
   }
 
   undo() {
     const commandOrCommands = this.undoStack.pop();
     if (commandOrCommands) {
-      if (Array.isArray(commandOrCommands)) {
-        for (let i = commandOrCommands.length - 1; i >= 0; i--) {
-          commandOrCommands[i].undo();
-        }
-      } else {
-        commandOrCommands.undo();
-      }
+      this._undoCommand(commandOrCommands);
       this.redoStack.push(commandOrCommands);
     }
   }
@@ -34,11 +27,7 @@ export class UndoRedoContext {
   redo() {
     const commandOrCommands = this.redoStack.pop();
     if (commandOrCommands) {
-      if (Array.isArray(commandOrCommands)) {
-        commandOrCommands.forEach(command => command.execute());
-      } else {
-        commandOrCommands.execute();
-      }
+      this._executeCommand(commandOrCommands);
       this.undoStack.push(commandOrCommands);
     }
   }
@@ -55,5 +44,23 @@ export class UndoRedoContext {
     }
     this.isMultiEvent = false;
     this.multiEventCommands = [];
+  }
+
+  private _executeCommand(command: Command | Command[]) {
+    if (Array.isArray(command)) {
+        command.forEach(c => c.execute());
+    } else {
+        command.execute();
+    }
+  }
+
+  private _undoCommand(command: Command | Command[]) {
+    if (Array.isArray(command)) {
+        for (let i = command.length - 1; i >= 0; i--) {
+            command[i].undo();
+        }
+    } else {
+        command.undo();
+    }
   }
 }

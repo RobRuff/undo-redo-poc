@@ -1,4 +1,3 @@
-
 import { Command } from '../command';
 
 interface TimedCommand {
@@ -33,60 +32,22 @@ export class UndoRedoContextTree {
   }
 
   undo() {
-    const root = this.getRoot();
-    const allNodes = root.getAllNodes();
-    let latestCommand: TimedCommand | null = null;
-    let latestNode: UndoRedoContextTree | null = null;
-
-    for (const node of allNodes) {
-      if (node.undoStack.length > 0) {
-        const lastCommand = node.undoStack[node.undoStack.length - 1];
-        if (!latestCommand || lastCommand.timestamp > latestCommand.timestamp) {
-          latestCommand = lastCommand;
-          latestNode = node;
-        }
-      }
-    }
-
-    if (latestNode && latestCommand) {
+    const latestNode = this.findLatestUndoable();
+    if (latestNode) {
       const commandToUndo = latestNode.undoStack.pop();
       if (commandToUndo) {
-        if (Array.isArray(commandToUndo.command)) {
-          for (let i = commandToUndo.command.length - 1; i >= 0; i--) {
-            commandToUndo.command[i].undo();
-          }
-        } else {
-          commandToUndo.command.undo();
-        }
+        this._undoCommand(commandToUndo.command);
         latestNode.redoStack.push(commandToUndo);
       }
     }
   }
 
   redo() {
-    const root = this.getRoot();
-    const allNodes = root.getAllNodes();
-    let latestCommand: TimedCommand | null = null;
-    let latestNode: UndoRedoContextTree | null = null;
-
-    for (const node of allNodes) {
-      if (node.redoStack.length > 0) {
-        const lastCommand = node.redoStack[node.redoStack.length - 1];
-        if (!latestCommand || lastCommand.timestamp > latestCommand.timestamp) {
-          latestCommand = lastCommand;
-          latestNode = node;
-        }
-      }
-    }
-
-    if (latestNode && latestCommand) {
+    const latestNode = this.findLatestRedoable();
+    if (latestNode) {
       const commandToRedo = latestNode.redoStack.pop();
       if (commandToRedo) {
-        if (Array.isArray(commandToRedo.command)) {
-            commandToRedo.command.forEach(c => c.execute());
-        } else {
-            commandToRedo.command.execute();
-        }
+        this._executeCommand(commandToRedo.command);
         latestNode.undoStack.push(commandToRedo);
       }
     }
@@ -104,6 +65,60 @@ export class UndoRedoContextTree {
     }
     this.isMultiEvent = false;
     this.multiEventCommands = [];
+  }
+
+  private findLatestUndoable(): UndoRedoContextTree | null {
+    const allNodes = this.getRoot().getAllNodes();
+    let latestCommand: TimedCommand | null = null;
+    let latestNode: UndoRedoContextTree | null = null;
+
+    for (const node of allNodes) {
+      if (node.undoStack.length > 0) {
+        const lastCommand = node.undoStack[node.undoStack.length - 1];
+        if (!latestCommand || lastCommand.timestamp > latestCommand.timestamp) {
+          latestCommand = lastCommand;
+          latestNode = node;
+        }
+      }
+    }
+
+    return latestNode;
+  }
+
+  private findLatestRedoable(): UndoRedoContextTree | null {
+    const allNodes = this.getRoot().getAllNodes();
+    let latestCommand: TimedCommand | null = null;
+    let latestNode: UndoRedoContextTree | null = null;
+
+    for (const node of allNodes) {
+      if (node.redoStack.length > 0) {
+        const lastCommand = node.redoStack[node.redoStack.length - 1];
+        if (!latestCommand || lastCommand.timestamp > latestCommand.timestamp) {
+          latestCommand = lastCommand;
+          latestNode = node;
+        }
+      }
+    }
+
+    return latestNode;
+  }
+
+  private _executeCommand(command: Command | Command[]) {
+    if (Array.isArray(command)) {
+        command.forEach(c => c.execute());
+    } else {
+        command.execute();
+    }
+  }
+
+  private _undoCommand(command: Command | Command[]) {
+    if (Array.isArray(command)) {
+        for (let i = command.length - 1; i >= 0; i--) {
+            command[i].undo();
+        }
+    } else {
+        command.undo();
+    }
   }
 
   private getRoot(): UndoRedoContextTree {
